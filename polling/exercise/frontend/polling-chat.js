@@ -36,13 +36,18 @@ async function getNewMsgs() {
   let json;
   try {
     const res = await fetch("/poll");
+    if (res.status >= 400) {
+      throw new Error("request did not succeed. " + res.status);
+    }
     json = await res.json();
+    allChat = json.msg;
+    render();
+    failedTries = 0;
   } catch (err) {
     // backoff code
     console.error("polling error", err);
+    failedTries += 1;
   }
-  allChat = json.msg;
-  render();
 }
 
 function render() {
@@ -61,10 +66,12 @@ const template = (user, msg) =>
 // make the first request
 let timeToMakeNextRequest = 0;
 
+const BACKOFF = 5000;
+let failedTries = 0;
 async function rafTimer(time) {
   if (timeToMakeNextRequest <= time) {
     await getNewMsgs();
-    timeToMakeNextRequest = time + INTERVAL;
+    timeToMakeNextRequest = time + INTERVAL + failedTries * BACKOFF;
   }
   requestAnimationFrame(rafTimer);
 }
